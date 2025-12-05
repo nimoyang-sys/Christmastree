@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Christmas Tree 3D</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            overflow: hidden;
+            background: #05140b;
+            font-family: 'Segoe UI', sans-serif;
+            color: #d4af37;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 10px #d4af37, 0 0 20px #8b0000;
+        }
+
+        h1 {
+            font-size: 2rem;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #d4af37;
+            display: inline-block;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+
+        .status-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(139, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid #d4af37;
+        }
+
+        .upload-btn {
+            pointer-events: auto;
+            background: linear-gradient(45deg, #8b0000, #b22222);
+            color: #d4af37;
+            border: 1px solid #d4af37;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.3s;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        .upload-btn:hover {
+            box-shadow: 0 0 20px #d4af37;
+            transform: scale(1.05);
+        }
+
+        .controls-guide {
+            background: rgba(5, 20, 11, 0.9);
+            padding: 15px 20px;
+            border-left: 3px solid #d4af37;
+            max-width: 300px;
+            pointer-events: auto;
+            border-radius: 0 8px 8px 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .controls-guide.hidden {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .controls-guide p {
+            margin: 8px 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .icon {
+            margin-right: 10px;
+            font-size: 1.1rem;
+            width: 30px;
+            text-align: center;
+        }
+
+        .snowflake {
+            position: fixed;
+            color: #fff;
+            pointer-events: none;
+            z-index: 5;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(360deg); }
+        }
+
+        #loading {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #05140b;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #d4af37;
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #1a3a25;
+            border-top: 4px solid #d4af37;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loader"></div>
+        <div>Merry Christmas</div>
+        <div style="margin-top:10px;font-size:0.9rem;opacity:0.7">Loading Magic...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="header">
+            <h1>Merry Christmas</h1>
+            <div class="subtitle">Add Memories</div>
+            <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+            <button class="upload-btn" onclick="document.getElementById('file-input').click()">Upload Photos</button>
+        </div>
+
+        <div class="status-panel">
+            <div id="current-state" class="status-text">Christmas Tree</div>
+        </div>
+
+        <div class="controls-guide" id="controls">
+            <p><span class="icon">1</span> <strong>Key 1:</strong> Form Tree</p>
+            <p><span class="icon">2</span> <strong>Key 2:</strong> Scatter</p>
+            <p><span class="icon">🖱️</span> <strong>Drag:</strong> Rotate</p>
+            <p><span class="icon">🔍</span> <strong>Click:</strong> View Photo</p>
+            <p><span class="icon">H</span> <strong>Key H:</strong> Hide Controls</p>
+            <p><span class="icon">Esc</span> <strong>ESC:</strong> Back</p>
+        </div>
+    </div>
+
+    <!-- 使用传统 script 标签加载 Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // 等待 Three.js 加载完成
+        window.onload = function() {
+            initScene();
+        };
+
+        function initScene() {
+            // === 配置 ===
+            const CONFIG = {
+                particleCount: 200,
+                photoCount: 8,
+                treeHeight: 22,
+                treeRadius: 9
+            };
+
+            // === 状态 ===
+            let state = 'TREE';
+            let inspectedObject = null;
+            let controlsVisible = true;
+            const particles = [];
+            const photoMeshes = [];
+
+            // === Three.js 初始化 ===
+            const container = document.getElementById('canvas-container');
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05140b);
+            scene.fog = new THREE.FogExp2(0x05140b, 0.012);
+
+            const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+            camera.position.set(0, 12, 38);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // === 灯光 ===
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+            const mainLight = new THREE.PointLight(0xD4AF37, 1.5, 100);
+            mainLight.position.set(0, 25, 15);
+            scene.add(mainLight);
+
+            const bottomLight = new THREE.PointLight(0xB22222, 1, 80);
+            bottomLight.position.set(0, -5, 0);
+            scene.add(bottomLight);
+
+            const starLight = new THREE.PointLight(0xFFD700, 2, 50);
+            starLight.position.set(0, 25, 0);
+            scene.add(starLight);
+
+            // === 材质 ===
+            const matGold = new THREE.MeshStandardMaterial({
+                color: 0xD4AF37, roughness: 0.3, metalness: 0.8,
+                emissive: 0xD4AF37, emissiveIntensity: 0.3
+            });
+            const matRed = new THREE.MeshStandardMaterial({
+                color: 0xB22222, roughness: 0.4, metalness: 0.3,
+                emissive: 0xB22222, emissiveIntensity: 0.2
+            });
+            const matGreen = new THREE.MeshStandardMaterial({
+                color: 0x2F5A41, roughness: 0.7, metalness: 0.1
+            });
+            const matWhite = new THREE.MeshStandardMaterial({
+                color: 0xFFFFFF, roughness: 0.5, metalness: 0.1,
+                emissive: 0xFFFFFF, emissiveIntensity: 0.2
+            });
+
+            // === 几何体 ===
+            const geoSphere = new THREE.SphereGeometry(0.4, 12, 12);
+            const geoBox = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const geoOct = new THREE.OctahedronGeometry(0.5);
+            const geoPhoto = new THREE.PlaneGeometry(2.5, 3.2);
+
+            // === 主容器 ===
+            const group = new THREE.Group();
+            scene.add(group);
+
+            // === 辅助函数 ===
+            function getTreePosition(idx, total) {
+                const t = idx / total;
+                const y = t * CONFIG.treeHeight - CONFIG.treeHeight / 2 + 8;
+                const radius = (1 - t) * CONFIG.treeRadius * (0.8 + Math.random() * 0.4);
+                const angle = idx * 2.4 + Math.random() * 0.5;
+                return new THREE.Vector3(
+                    Math.cos(angle) * radius,
+                    y,
+                    Math.sin(angle) * radius
+                );
+            }
+
+            function getScatterPosition() {
+                const spread = 28;
+                return new THREE.Vector3(
+                    (Math.random() - 0.5) * spread * 2,
+                    (Math.random() - 0.5) * spread + 8,
+                    (Math.random() - 0.5) * spread * 1.2
+                );
+            }
+
+            // === 创建装饰物 ===
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const rand = Math.random();
+                let mesh;
+
+                if (rand < 0.4) {
+                    mesh = new THREE.Mesh(geoSphere, matGold.clone());
+                } else if (rand < 0.7) {
+                    mesh = new THREE.Mesh(geoSphere, matRed.clone());
+                } else if (rand < 0.85) {
+                    mesh = new THREE.Mesh(geoBox, matGreen.clone());
+                } else {
+                    mesh = new THREE.Mesh(geoOct, matWhite.clone());
+                }
+
+                const scale = 0.6 + Math.random() * 0.8;
+                mesh.scale.setScalar(scale);
+
+                mesh.userData = {
+                    type: 'deco',
+                    treePos: getTreePosition(i, CONFIG.particleCount),
+                    scatterPos: getScatterPosition(),
+                    rotSpeed: (Math.random() - 0.5) * 0.02,
+                    floatOffset: Math.random() * Math.PI * 2
+                };
+
+                mesh.position.copy(mesh.userData.treePos);
+                group.add(mesh);
+                particles.push(mesh);
+            }
+
+            // === 创建顶部星星 ===
+            const starGeo = new THREE.OctahedronGeometry(1.2);
+            const starMat = new THREE.MeshStandardMaterial({
+                color: 0xFFD700, emissive: 0xFFD700, emissiveIntensity: 0.8,
+                roughness: 0.2, metalness: 0.9
+            });
+            const star = new THREE.Mesh(starGeo, starMat);
+            star.position.set(0, CONFIG.treeHeight / 2 + 10, 0);
+            star.userData = {
+                type: 'star',
+                treePos: new THREE.Vector3(0, CONFIG.treeHeight / 2 + 10, 0),
+                scatterPos: new THREE.Vector3(0, 20, -10),
+                floatOffset: 0
+            };
+            group.add(star);
+            particles.push(star);
+
+            // === 创建照片 ===
+            const defaultColors = [0xFF6B6B, 0x4ECDC4, 0xFFE66D, 0x95E1D3, 0xF38181, 0xAA96DA, 0xFCBAD3, 0xA8D8EA];
+
+            for (let i = 0; i < CONFIG.photoCount; i++) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 320;
+                const ctx = canvas.getContext('2d');
+
+                // 金色边框
+                ctx.fillStyle = '#d4af37';
+                ctx.fillRect(0, 0, 256, 320);
+
+                // 内部颜色
+                const color = defaultColors[i % defaultColors.length];
+                ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                ctx.fillRect(8, 8, 240, 304);
+
+                // 添加图标
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('📷', 128, 150);
+                ctx.font = '18px Arial';
+                ctx.fillText('Photo ' + (i + 1), 128, 190);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    side: THREE.DoubleSide
+                });
+
+                const mesh = new THREE.Mesh(geoPhoto, mat);
+
+                const treeIdx = Math.floor((i + 0.5) * (CONFIG.particleCount / CONFIG.photoCount));
+                const treePos = getTreePosition(treeIdx, CONFIG.particleCount);
+                const dir = new THREE.Vector3(treePos.x, 0, treePos.z).normalize();
+                treePos.add(dir.multiplyScalar(1.5));
+
+                mesh.userData = {
+                    type: 'photo',
+                    treePos: treePos.clone(),
+                    scatterPos: getScatterPosition(),
+                    floatOffset: Math.random() * Math.PI * 2
+                };
+
+                mesh.position.copy(treePos);
+                mesh.lookAt(0, mesh.position.y, 0);
+
+                group.add(mesh);
+                particles.push(mesh);
+                photoMeshes.push(mesh);
+            }
+
+            // === 动画状态 ===
+            let animating = false;
+
+            function switchState(newState) {
+                if (state === newState || animating) return;
+                state = newState;
+                animating = true;
+
+                document.getElementById('current-state').innerText =
+                    state === 'TREE' ? 'Christmas Tree' :
+                    state === 'SCATTER' ? 'Floating' : 'Viewing Photo';
+
+                if (inspectedObject) {
+                    inspectedObject.scale.setScalar(1);
+                    inspectedObject = null;
+                }
+
+                setTimeout(() => { animating = false; }, 2000);
+            }
+
+            function enterInspectMode(mesh) {
+                if (!mesh || mesh.userData.type !== 'photo' || state === 'INSPECT') return;
+                state = 'INSPECT';
+                inspectedObject = mesh;
+                document.getElementById('current-state').innerText = 'Viewing (Click to close)';
+            }
+
+            // === 文件上传 ===
+            document.getElementById('file-input').addEventListener('change', function(e) {
+                const files = e.target.files;
+                if (!files.length) return;
+
+                Array.from(files).forEach(function(file, index) {
+                    if (index >= photoMeshes.length) return;
+
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 256;
+                            canvas.height = 320;
+                            const ctx = canvas.getContext('2d');
+
+                            ctx.fillStyle = '#d4af37';
+                            ctx.fillRect(0, 0, 256, 320);
+
+                            const scale = Math.max(240 / img.width, 304 / img.height);
+                            const w = img.width * scale;
+                            const h = img.height * scale;
+                            const x = 8 + (240 - w) / 2;
+                            const y = 8 + (304 - h) / 2;
+
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.rect(8, 8, 240, 304);
+                            ctx.clip();
+                            ctx.drawImage(img, x, y, w, h);
+                            ctx.restore();
+
+                            const texture = new THREE.CanvasTexture(canvas);
+                            photoMeshes[index].material.map = texture;
+                            photoMeshes[index].material.needsUpdate = true;
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+
+            // === 鼠标交互 ===
+            let isDragging = false;
+            let dragMoved = false;
+            let prevMouse = { x: 0, y: 0 };
+            const raycaster = new THREE.Raycaster();
+            const pointer = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                dragMoved = false;
+                prevMouse.x = e.clientX;
+                prevMouse.y = e.clientY;
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+
+                const dx = e.clientX - prevMouse.x;
+                const dy = e.clientY - prevMouse.y;
+
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                    dragMoved = true;
+                }
+
+                group.rotation.y += dx * 0.005;
+                group.rotation.x = Math.max(-0.5, Math.min(0.5, group.rotation.x + dy * 0.003));
+
+                prevMouse.x = e.clientX;
+                prevMouse.y = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('click', function(e) {
+                if (dragMoved) return;
+
+                pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+                pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(pointer, camera);
+
+                if (state === 'INSPECT') {
+                    switchState('SCATTER');
+                    return;
+                }
+
+                if (state === 'SCATTER') {
+                    const intersects = raycaster.intersectObjects(photoMeshes);
+                    if (intersects.length > 0) {
+                        enterInspectMode(intersects[0].object);
+                    }
+                }
+            });
+
+            // === 键盘控制 ===
+            document.addEventListener('keydown', function(e) {
+                if (e.key === '1') switchState('TREE');
+                if (e.key === '2') switchState('SCATTER');
+                if (e.key === 'h' || e.key === 'H') {
+                    controlsVisible = !controlsVisible;
+                    document.getElementById('controls').classList.toggle('hidden', !controlsVisible);
+                }
+                if (e.key === 'Escape') {
+                    if (state === 'INSPECT') switchState('SCATTER');
+                    else if (state === 'SCATTER') switchState('TREE');
+                }
+            });
+
+            // === 动画循环 ===
+            const clock = new THREE.Clock();
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                const time = clock.getElapsedTime();
+
+                // 粒子动画
+                particles.forEach(function(p, i) {
+                    const targetPos = state === 'TREE' ? p.userData.treePos : p.userData.scatterPos;
+
+                    if (state === 'INSPECT' && p === inspectedObject) {
+                        // 照片移到相机前方
+                        const targetInspect = new THREE.Vector3(0, 10, 25);
+                        p.position.lerp(targetInspect, 0.08);
+                        p.rotation.set(0, 0, 0);
+                        p.scale.lerp(new THREE.Vector3(2.5, 2.5, 2.5), 0.08);
+                    } else {
+                        p.position.lerp(targetPos, 0.03);
+
+                        if (state === 'SCATTER') {
+                            p.position.y += Math.sin(time * 0.8 + p.userData.floatOffset) * 0.006;
+                            if (p.userData.rotSpeed) {
+                                p.rotation.y += p.userData.rotSpeed;
+                            }
+                        }
+
+                        // 缩放恢复
+                        if (p.scale.x > 1.1) {
+                            p.scale.lerp(new THREE.Vector3(1, 1, 1), 0.05);
+                        }
+                    }
+                });
+
+                // 树状态自动旋转
+                if (state === 'TREE') {
+                    group.rotation.y += 0.002;
+                }
+
+                // 星星旋转
+                star.rotation.y += 0.015;
+
+                // 星星闪烁
+                starLight.intensity = 1.5 + Math.sin(time * 3) * 0.5;
+
+                renderer.render(scene, camera);
+            }
+
+            // === 窗口调整 ===
+            window.addEventListener('resize', function() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // === 雪花效果 ===
+            function createSnowflakes() {
+                for (let i = 0; i < 25; i++) {
+                    setTimeout(function() {
+                        const snowflake = document.createElement('div');
+                        snowflake.className = 'snowflake';
+                        snowflake.innerHTML = '❄';
+                        snowflake.style.left = Math.random() * 100 + 'vw';
+                        snowflake.style.top = '-20px';
+                        snowflake.style.animationDuration = (4 + Math.random() * 4) + 's';
+                        snowflake.style.opacity = 0.3 + Math.random() * 0.5;
+                        snowflake.style.fontSize = (10 + Math.random() * 14) + 'px';
+                        document.body.appendChild(snowflake);
+
+                        setTimeout(function() {
+                            snowflake.remove();
+                        }, 8000);
+                    }, i * 150);
+                }
+            }
+
+            // === 启动 ===
+            document.getElementById('loading').style.display = 'none';
+            animate();
+            createSnowflakes();
+            setInterval(createSnowflakes, 5000);
+        }
+    </script>
+</body>
+</html>
