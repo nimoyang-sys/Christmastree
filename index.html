@@ -731,12 +731,12 @@
                 iceBlue: 0x87ceeb,
             },
             particles: {
-                count: 2500,      // Increased from 1500
-                dustCount: 3000,  // Increased from 2500
+                count: 1800,      // Reduced for better visibility
+                dustCount: 2000,  // Reduced
                 treeHeight: 24,
                 treeRadius: 8,
-                giftBoxCount: 15, // Gift boxes under tree
-                stringLightCount: 200 // Twinkling lights
+                giftBoxCount: 12, // Gift boxes under tree
+                stringLightCount: 150 // Twinkling lights
             },
             camera: {
                 z: 50
@@ -1281,11 +1281,34 @@
         }
 
         function addPhotoToScene(texture) {
-            const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
+            // Get image dimensions from texture
+            const image = texture.image;
+            let aspectRatio = 1;
+            if (image && image.width && image.height) {
+                aspectRatio = image.width / image.height;
+            }
+
+            // Calculate frame dimensions based on aspect ratio
+            const maxSize = 1.4;
+            let frameWidth, frameHeight;
+            if (aspectRatio >= 1) {
+                // Landscape or square
+                frameWidth = maxSize;
+                frameHeight = maxSize / aspectRatio;
+            } else {
+                // Portrait
+                frameHeight = maxSize;
+                frameWidth = maxSize * aspectRatio;
+            }
+
+            // Frame with border
+            const borderSize = 0.1;
+            const frameGeo = new THREE.BoxGeometry(frameWidth + borderSize, frameHeight + borderSize, 0.05);
             const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1.0, roughness: 0.1 });
             const frame = new THREE.Mesh(frameGeo, frameMat);
 
-            const photoGeo = new THREE.PlaneGeometry(1.2, 1.2);
+            // Photo plane matching aspect ratio
+            const photoGeo = new THREE.PlaneGeometry(frameWidth, frameHeight);
             const photoMat = new THREE.MeshBasicMaterial({ map: texture });
             const photo = new THREE.Mesh(photoGeo, photoMat);
             photo.position.z = 0.04;
@@ -1344,15 +1367,31 @@
 
         // Load photo from URL and add to scene
         function loadPhotoFromURL(url, fileName = 'photo', storageRef = null) {
-            new THREE.TextureLoader().load(url, (t) => {
+            // Check if this photo is already loaded (prevent duplicates)
+            const exists = window.uploadedPhotos && window.uploadedPhotos.some(p => p.url === url);
+            if (exists) {
+                console.log('Photo already loaded, skipping:', fileName);
+                return;
+            }
+
+            // Create texture loader with crossOrigin
+            const loader = new THREE.TextureLoader();
+            loader.crossOrigin = 'anonymous';
+
+            loader.load(url, (t) => {
                 t.colorSpace = THREE.SRGBColorSpace;
                 const mesh = addPhotoToScene(t);
                 userPhotoMeshes.push(mesh);
                 // Add to manager
                 if (window.addPhotoToManager) {
                     window.addPhotoToManager(fileName, url, storageRef);
+                    console.log('Added to manager:', fileName);
                 }
-            }, undefined, (err) => {
+            },
+            (progress) => {
+                console.log('Loading photo:', fileName, Math.round((progress.loaded / progress.total) * 100) + '%');
+            },
+            (err) => {
                 console.warn('Failed to load photo:', url, err);
             });
         }
