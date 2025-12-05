@@ -303,7 +303,7 @@
         /* Status */
         .status-text {
             position: absolute;
-            top: 40px;
+            bottom: 40px;
             right: 40px;
             color: #d4af37;
             font-size: 11px;
@@ -313,6 +313,11 @@
             padding: 8px 15px;
             border: 1px solid rgba(212, 175, 55, 0.3);
             border-radius: 20px;
+        }
+        @media (max-width: 768px) {
+            .status-text {
+                display: none;
+            }
         }
 
         /* Argon Logo */
@@ -489,6 +494,8 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const storage = firebase.storage();
+        // Expose to window for module access
+        window.firebaseStorage = storage;
     </script>
 </head>
 <body>
@@ -684,7 +691,7 @@
             try {
                 // Delete from Firebase Storage
                 if (photo.storageRef) {
-                    await storage.ref(photo.storageRef).delete();
+                    await window.firebaseStorage.ref(photo.storageRef).delete();
                     console.log('Deleted from Firebase:', photo.storageRef);
                 }
 
@@ -1306,7 +1313,7 @@
 
             try {
                 // Upload file
-                const snapshot = await storage.ref(storageRefPath).put(file);
+                const snapshot = await window.firebaseStorage.ref(storageRefPath).put(file);
                 // Get download URL
                 const downloadURL = await snapshot.ref.getDownloadURL();
                 console.log('Uploaded to Firebase:', downloadURL);
@@ -1320,7 +1327,7 @@
         // Load all images from Firebase Storage
         async function loadPhotosFromFirebase() {
             try {
-                const listRef = storage.ref('photos');
+                const listRef = window.firebaseStorage.ref('photos');
                 const result = await listRef.listAll();
 
                 for (const itemRef of result.items) {
