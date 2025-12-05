@@ -1288,6 +1288,11 @@
                 aspectRatio = image.width / image.height;
             }
 
+            // Ensure texture is centered and not repeated
+            texture.center.set(0.5, 0.5);
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+
             // Calculate frame dimensions based on aspect ratio
             const maxSize = 1.4;
             let frameWidth, frameHeight;
@@ -1307,11 +1312,11 @@
             const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1.0, roughness: 0.1 });
             const frame = new THREE.Mesh(frameGeo, frameMat);
 
-            // Photo plane matching aspect ratio
+            // Photo plane matching aspect ratio - centered at origin
             const photoGeo = new THREE.PlaneGeometry(frameWidth, frameHeight);
-            const photoMat = new THREE.MeshBasicMaterial({ map: texture });
+            const photoMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
             const photo = new THREE.Mesh(photoGeo, photoMat);
-            photo.position.z = 0.04;
+            photo.position.set(0, 0, 0.04); // Centered, slightly in front of frame
 
             const group = new THREE.Group();
             group.add(frame);
