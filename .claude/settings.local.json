@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd MediaPipe hand gesture control\n\n- Fist: Form Christmas tree\n- Open hand: Scatter/float mode\n- Pinch: View photo\n- Hand movement: Rotate scene\n- Fallback to keyboard/mouse if no camera\n\n🎄 Merry Christmas!\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
