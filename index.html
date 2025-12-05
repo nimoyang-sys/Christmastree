@@ -60,6 +60,10 @@
             pointer-events: auto;
             text-align: center;
             transition: opacity 0.5s ease;
+            display: none; /* Hidden by default - admin only */
+        }
+        .upload-wrapper.admin-enabled {
+            display: block;
         }
         .upload-btn {
             background: rgba(20, 20, 20, 0.6);
@@ -85,6 +89,135 @@
             margin-top: 8px;
             letter-spacing: 1px;
             text-transform: uppercase;
+        }
+
+        /* Admin Login Modal */
+        .admin-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        .admin-modal.active {
+            display: flex;
+        }
+        .admin-box {
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            padding: 40px;
+            text-align: center;
+            max-width: 320px;
+        }
+        .admin-box h2 {
+            color: #d4af37;
+            font-size: 14px;
+            letter-spacing: 3px;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            font-weight: 400;
+        }
+        .admin-box input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: #fff;
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .admin-box input:focus {
+            border-color: #d4af37;
+        }
+        .admin-box input::placeholder {
+            color: rgba(255,255,255,0.3);
+        }
+        .admin-box .error-msg {
+            color: #ff4444;
+            font-size: 11px;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .admin-box .error-msg.show {
+            opacity: 1;
+        }
+        .admin-box .close-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: #fff;
+            font-size: 32px;
+            cursor: pointer;
+            transition: color 0.3s;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+        .admin-box .close-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .admin-box {
+                margin: 20px;
+                padding: 30px 25px;
+            }
+            .admin-box .close-btn {
+                top: -50px;
+                right: 50%;
+                transform: translateX(50%);
+            }
+            .controls-guide {
+                display: none;
+            }
+            h1 {
+                font-size: 32px;
+                letter-spacing: 3px;
+            }
+            .secret-trigger {
+                width: 80px;
+                height: 80px;
+            }
+        }
+        .admin-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(212, 175, 55, 0.6);
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            z-index: 5;
+            display: none;
+        }
+        .admin-indicator.show {
+            display: block;
+        }
+
+        /* Secret trigger area - invisible */
+        .secret-trigger {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            z-index: 100;
+            cursor: default;
         }
 
         #file-input { display: none; }
@@ -206,6 +339,22 @@
 
     <div id="canvas-container"></div>
 
+    <!-- Secret trigger: triple-click top-left corner OR Ctrl+Shift+A -->
+    <div class="secret-trigger" id="secret-trigger"></div>
+
+    <!-- Admin Login Modal -->
+    <div class="admin-modal" id="admin-modal">
+        <div class="admin-box" style="position: relative;">
+            <span class="close-btn" id="close-modal">&times;</span>
+            <h2>Admin Access</h2>
+            <input type="password" id="admin-password" placeholder="Enter Password">
+            <div class="error-msg" id="error-msg">Incorrect password</div>
+        </div>
+    </div>
+
+    <!-- Admin indicator -->
+    <div class="admin-indicator" id="admin-indicator">🔓 Admin Mode</div>
+
     <div id="ui-layer">
         <h1>Merry Christmas</h1>
 
@@ -239,6 +388,83 @@
         <canvas id="webcam-preview"></canvas>
         <div class="webcam-label">Hand Tracking</div>
     </div>
+
+    <script>
+        // ============ ADMIN AUTHENTICATION ============
+        // Change this password to your own secret password
+        const ADMIN_PASSWORD = 'christmas2024';
+
+        let isAdmin = false;
+        let clickCount = 0;
+        let clickTimer = null;
+
+        // Check if already logged in (session storage)
+        if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+            isAdmin = true;
+            enableAdminMode();
+        }
+
+        function enableAdminMode() {
+            isAdmin = true;
+            sessionStorage.setItem('adminLoggedIn', 'true');
+            document.querySelector('.upload-wrapper').classList.add('admin-enabled');
+            document.getElementById('admin-indicator').classList.add('show');
+            document.getElementById('admin-modal').classList.remove('active');
+        }
+
+        function showAdminModal() {
+            document.getElementById('admin-modal').classList.add('active');
+            document.getElementById('admin-password').value = '';
+            document.getElementById('admin-password').focus();
+            document.getElementById('error-msg').classList.remove('show');
+        }
+
+        function hideAdminModal() {
+            document.getElementById('admin-modal').classList.remove('active');
+        }
+
+        // Triple-click on secret trigger area (top-left corner)
+        document.getElementById('secret-trigger').addEventListener('click', function() {
+            clickCount++;
+            if (clickTimer) clearTimeout(clickTimer);
+
+            if (clickCount >= 3) {
+                clickCount = 0;
+                if (!isAdmin) showAdminModal();
+            }
+
+            clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+        });
+
+        // Ctrl+Shift+A shortcut
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                if (!isAdmin) showAdminModal();
+            }
+        });
+
+        // Close modal
+        document.getElementById('close-modal').addEventListener('click', hideAdminModal);
+        document.getElementById('admin-modal').addEventListener('click', function(e) {
+            if (e.target === this) hideAdminModal();
+        });
+
+        // Password verification
+        document.getElementById('admin-password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (this.value === ADMIN_PASSWORD) {
+                    enableAdminMode();
+                } else {
+                    document.getElementById('error-msg').classList.add('show');
+                    this.value = '';
+                    setTimeout(() => {
+                        document.getElementById('error-msg').classList.remove('show');
+                    }, 2000);
+                }
+            }
+        });
+    </script>
 
     <script type="module">
         import * as THREE from 'three';
