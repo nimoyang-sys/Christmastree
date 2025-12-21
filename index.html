@@ -436,6 +436,31 @@
             opacity: 1;
         }
 
+        /* Loader */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        #loader::after {
+            content: '載入中...';
+            color: #ffd700;
+            font-size: 1.5em;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
         /* Mobile */
         @media (max-width: 768px) {
             #merry-christmas-text {
@@ -501,6 +526,9 @@
     </script>
 </head>
 <body>
+    <!-- Loader -->
+    <div id="loader"></div>
+
     <video id="webcam-feed" autoplay playsinline></video>
 
     <div id="ui-container">
