@@ -24,36 +24,64 @@
             pointer-events: none;
             z-index: 10;
         }
+        /* 控制面板 - 金色半透明質感 */
         #controls-panel {
             position: absolute;
-            bottom: 20px;
+            bottom: 30px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 15px;
-            border-radius: 8px;
+            background: rgba(20, 20, 20, 0.7);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 215, 0, 0.1);
             pointer-events: auto;
             color: #eee;
+            backdrop-filter: blur(8px);
+            min-width: 220px;
             font-size: 14px;
+        }
+        #controls-panel .hint-list {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        #controls-panel .hint-title {
+            color: #ffd700;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #controls-panel .hint-item {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            margin: 5px 0;
         }
         #controls-panel button {
             display: block;
             width: 100%;
-            padding: 8px 15px;
-            margin-bottom: 10px;
-            background-color: #ffd700;
-            color: #333;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1a1a1a;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
-            transition: background-color 0.3s ease;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
         }
         #controls-panel button:hover {
-            background-color: #ffe033;
+            background: linear-gradient(135deg, #ffe033, #ffcc00);
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5);
+            transform: translateY(-1px);
         }
         #controls-panel button:last-child {
             margin-bottom: 0;
         }
+
+        /* 頂部標題 */
         #merry-christmas-text {
             position: absolute;
             top: 5%;
@@ -62,9 +90,20 @@
             font-family: 'Brush Script MT', 'Cinzel', cursive;
             font-size: 4em;
             color: #ffd700;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.5);
+            text-shadow:
+                0 0 10px rgba(255, 215, 0, 0.8),
+                0 0 20px rgba(255, 215, 0, 0.6),
+                0 0 40px rgba(255, 215, 0, 0.4),
+                0 0 80px rgba(255, 215, 0, 0.2);
             pointer-events: none;
+            animation: titleGlow 3s ease-in-out infinite alternate;
         }
+        @keyframes titleGlow {
+            from { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.6); }
+            to { text-shadow: 0 0 20px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 215, 0, 0.8), 0 0 60px rgba(255, 215, 0, 0.4); }
+        }
+
+        /* Webcam feed */
         #webcam-feed {
             position: absolute;
             top: 10px;
@@ -77,16 +116,46 @@
             z-index: 1;
             display: none;
         }
-        #bottom-hint {
+
+        /* 手勢指示器盒子 - 右下角 */
+        #gesture-indicator-box {
             position: absolute;
-            bottom: 20px;
+            bottom: 30px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 15px;
-            border-radius: 8px;
-            color: #eee;
-            font-size: 14px;
-            pointer-events: auto;
+            width: 130px;
+            height: 100px;
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 15px rgba(255, 215, 0, 0.1);
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+            overflow: hidden;
+        }
+        #gesture-icon {
+            font-size: 36px;
+            margin-bottom: 5px;
+            filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5));
+        }
+        #gesture-text {
+            color: #ffd700;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        #gesture-indicator-box canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            border-radius: 10px;
         }
 
         /* Admin 相關樣式 */
@@ -438,10 +507,18 @@
         <div id="merry-christmas-text">Merry Christmas!</div>
 
         <div id="controls-panel">
-            <p style="margin: 0 0 10px 0; color: #ffd700;">模式切換:</p>
+            <!-- 操作提示列表 -->
+            <div class="hint-list">
+                <div class="hint-title">操作提示</div>
+                <div class="hint-item">✊ 握拳：合攏聖誕樹</div>
+                <div class="hint-item">🖐️ 張開：展開照片雲</div>
+                <div class="hint-item">🤌 捏合：查看照片細節</div>
+                <div class="hint-item">🖱️ 拖曳：旋轉視角</div>
+            </div>
+
+            <!-- 模式切換按鈕 -->
             <button id="btn-collapsed">✊ 合攏 (COLLAPSED)</button>
             <button id="btn-scattered">🖐️ 散開 (SCATTERED)</button>
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #aaa;">鍵盤: 1/2 切換, H 隱藏, Esc 返回</p>
 
             <!-- Admin上傳區域 -->
             <div class="upload-section" id="upload-section">
@@ -453,11 +530,11 @@
             </div>
         </div>
 
-        <div id="bottom-hint">
-            操作方式：<br>
-            - 鍵盤: 1 合攏, 2 散開, H 隱藏UI, Esc 返回<br>
-            - 手勢: 握拳(合攏), 張開(散開), 捏合(聚焦)<br>
-            - 滑鼠: 拖曳旋轉視角
+        <!-- 手勢指示器盒子 -->
+        <div id="gesture-indicator-box">
+            <div id="gesture-icon">❓</div>
+            <div id="gesture-text">等待手勢...</div>
+            <canvas id="gesture-preview"></canvas>
         </div>
     </div>
 
@@ -1674,12 +1751,11 @@
         }
 
         function processGestures(result) {
-            const gestureIndicator = document.getElementById('gesture-indicator');
-            const status = document.getElementById('status');
+            const iconEl = document.getElementById('gesture-icon');
+            const textEl = document.getElementById('gesture-text');
 
             if (result.landmarks && result.landmarks.length > 0) {
                 STATE.hand.detected = true;
-                gestureIndicator.classList.add('active');
 
                 const lm = result.landmarks[0];
                 STATE.hand.x = (lm[9].x - 0.5) * 2;
@@ -1694,35 +1770,36 @@
 
                 if (pinchDist < 0.05) {
                     // 捏合 - 查看照片
-                    gestureIndicator.textContent = '🤏';
+                    iconEl.textContent = '🤌';
+                    textEl.textContent = 'FOCUS MODE';
                     if (STATE.mode !== STATES.FOCUS) {
                         STATE.mode = STATES.FOCUS;
                         STATE.autoRotate = false;
-                        status.textContent = 'Viewing Photo';
                         updateGestureButtons();
                         const photos = particleSystem.filter(p => p.type === 'PHOTO');
                         if (photos.length) STATE.focusTarget = photos[Math.floor(Math.random()*photos.length)].mesh;
                     }
                 } else if (avgDist < 0.25) {
                     // 握拳 - 合攏態
-                    gestureIndicator.textContent = '✊';
+                    iconEl.textContent = '✊';
+                    textEl.textContent = 'COLLAPSED';
                     STATE.mode = STATES.COLLAPSED;
                     STATE.autoRotate = true;
                     STATE.focusTarget = null;
-                    status.textContent = 'Christmas Tree';
                     updateGestureButtons();
                 } else if (avgDist > 0.4) {
                     // 張開手 - 散開態
-                    gestureIndicator.textContent = '🖐️';
+                    iconEl.textContent = '🖐️';
+                    textEl.textContent = 'SCATTERED';
                     STATE.mode = STATES.SCATTERED;
                     STATE.autoRotate = false;
                     STATE.focusTarget = null;
-                    status.textContent = 'Floating';
                     updateGestureButtons();
                 }
             } else {
                 STATE.hand.detected = false;
-                gestureIndicator.classList.remove('active');
+                iconEl.textContent = '❓';
+                textEl.textContent = 'NO HAND DETECTED';
             }
         }
 
