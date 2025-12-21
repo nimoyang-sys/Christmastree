@@ -1,97 +1,95 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Christmas Tree</title>
+    <title>互動式聖誕樹</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Times New Roman', serif; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-
-        /* UI Overlay - Minimalist */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column;
-            align-items: center;
-            padding-top: 40px;
-            box-sizing: border-box;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: #fff;
         }
-
-        /* When hidden class is applied to specific elements */
-        .ui-hidden {
-            opacity: 0;
-            pointer-events: none !important;
-        }
-
-        /* Loading */
-        #loader {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.8s ease-out;
-        }
-        .loader-text {
-            color: #d4af37; font-size: 14px; letter-spacing: 4px; margin-top: 20px;
-            text-transform: uppercase; font-weight: 100;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 1px solid rgba(212, 175, 55, 0.2);
-            border-top: 1px solid #d4af37; border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Typography - Centerpiece */
-        h1 {
-            color: #fceea7; font-size: 56px; margin: 0; font-weight: 400;
-            letter-spacing: 6px;
-            text-shadow: 0 0 50px rgba(252, 238, 167, 0.6);
-            background: linear-gradient(to bottom, #fff, #eebb66);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            font-family: 'Cinzel', 'Times New Roman', serif;
-            opacity: 0.9;
-            transition: opacity 0.5s ease;
-        }
-
-        /* Upload Button - Restored & Elegant */
-        .upload-wrapper {
-            margin-top: 20px;
-            pointer-events: auto;
-            text-align: center;
-            transition: opacity 0.5s ease;
-            display: none; /* Hidden by default - admin only */
-        }
-        .upload-wrapper.admin-enabled {
+        canvas {
             display: block;
         }
-        .upload-btn {
-            background: rgba(20, 20, 20, 0.6);
-            border: 1px solid rgba(212, 175, 55, 0.4);
-            color: #d4af37;
-            padding: 10px 25px;
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #controls-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: auto;
+            color: #eee;
+            font-size: 14px;
+        }
+        #controls-panel button {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            background-color: #ffd700;
+            color: #333;
+            border: none;
+            border-radius: 5px;
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-size: 10px;
-            transition: all 0.4s;
-            display: inline-block;
-            backdrop-filter: blur(5px);
+            font-weight: bold;
+            transition: background-color 0.3s ease;
         }
-        .upload-btn:hover {
-            background: #d4af37;
-            color: #000;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+        #controls-panel button:hover {
+            background-color: #ffe033;
         }
-        .hint-text {
-            color: rgba(212, 175, 55, 0.5);
-            font-size: 9px;
-            margin-top: 8px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+        #controls-panel button:last-child {
+            margin-bottom: 0;
+        }
+        #merry-christmas-text {
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Brush Script MT', 'Cinzel', cursive;
+            font-size: 4em;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.5);
+            pointer-events: none;
+        }
+        #webcam-feed {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 160px;
+            height: 120px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            transform: scaleX(-1);
+            z-index: 1;
+            display: none;
+        }
+        #bottom-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 14px;
+            pointer-events: auto;
         }
 
-        /* Admin Login Modal */
+        /* Admin 相關樣式 */
         .admin-modal {
             position: fixed;
             top: 0;
@@ -110,36 +108,33 @@
         }
         .admin-box {
             background: rgba(20, 20, 20, 0.95);
-            border: 1px solid rgba(212, 175, 55, 0.5);
+            border: 1px solid rgba(255, 215, 0, 0.5);
             padding: 40px;
             text-align: center;
             max-width: 320px;
+            border-radius: 8px;
         }
         .admin-box h2 {
-            color: #d4af37;
+            color: #ffd700;
             font-size: 14px;
             letter-spacing: 3px;
             margin-bottom: 25px;
             text-transform: uppercase;
-            font-weight: 400;
         }
         .admin-box input {
             width: 100%;
             padding: 12px 15px;
             background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(212, 175, 55, 0.3);
+            border: 1px solid rgba(255, 215, 0, 0.3);
             color: #fff;
             font-size: 14px;
-            letter-spacing: 2px;
             text-align: center;
             outline: none;
+            border-radius: 5px;
             transition: border-color 0.3s;
         }
         .admin-box input:focus {
-            border-color: #d4af37;
-        }
-        .admin-box input::placeholder {
-            color: rgba(255,255,255,0.3);
+            border-color: #ffd700;
         }
         .admin-box .error-msg {
             color: #ff4444;
@@ -158,7 +153,6 @@
             color: #fff;
             font-size: 32px;
             cursor: pointer;
-            transition: color 0.3s;
             width: 40px;
             height: 40px;
             display: flex;
@@ -170,46 +164,6 @@
         .admin-box .close-btn:hover {
             background: rgba(255,255,255,0.2);
         }
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .admin-box {
-                margin: 20px;
-                padding: 30px 25px;
-            }
-            .admin-box .close-btn {
-                top: -50px;
-                right: 50%;
-                transform: translateX(50%);
-            }
-            .controls-guide {
-                display: none;
-            }
-            h1 {
-                font-size: 32px;
-                letter-spacing: 3px;
-            }
-            .secret-trigger {
-                width: 80px;
-                height: 80px;
-            }
-        }
-        .admin-indicator {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            color: rgba(212, 175, 55, 0.6);
-            font-size: 9px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            z-index: 5;
-            display: none;
-        }
-        .admin-indicator.show {
-            display: block;
-        }
-
-        /* Secret trigger area - invisible */
         .secret-trigger {
             position: fixed;
             top: 0;
@@ -219,194 +173,90 @@
             z-index: 100;
             cursor: default;
         }
-
-        #file-input { display: none; }
-
-        /* Gesture Simulation Buttons */
-        #gesture-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            pointer-events: auto;
-        }
-        #gesture-controls p {
-            color: rgba(212, 175, 55, 0.8);
-            font-size: 10px;
-            letter-spacing: 2px;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-        }
-        .gesture-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        .gesture-btn {
-            background: rgba(255, 215, 0, 0.15);
-            border: 1px solid rgba(212, 175, 55, 0.5);
-            color: #d4af37;
-            padding: 12px 24px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 11px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            backdrop-filter: blur(5px);
-        }
-        .gesture-btn:hover {
-            background: rgba(255, 215, 0, 0.4);
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
-        }
-        .gesture-btn.active {
-            background: rgba(255, 215, 0, 0.5);
-            border-color: #d4af37;
-        }
-
-        /* Controls Guide */
-        .controls-guide {
-            position: absolute;
-            bottom: 40px;
-            left: 40px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 15px 20px;
-            border-left: 2px solid rgba(212, 175, 55, 0.4);
-            pointer-events: auto;
-            transition: opacity 0.5s ease;
-            max-width: 280px;
-        }
-        .controls-guide h3 {
-            color: #d4af37;
-            font-size: 11px;
-            letter-spacing: 2px;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            opacity: 0.8;
-        }
-        .controls-guide p {
-            color: rgba(255,255,255,0.7);
-            font-size: 10px;
-            margin: 6px 0;
-            display: flex;
-            align-items: center;
-        }
-        .controls-guide .icon {
-            width: 24px;
-            margin-right: 10px;
-            text-align: center;
-        }
-
-        /* Webcam feedback */
-        #webcam-wrapper {
-            position: absolute; bottom: 40px; right: 40px;
-            width: 160px; height: 120px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            border-radius: 8px;
-            overflow: hidden;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s ease;
-        }
-        #webcam-wrapper.active {
-            opacity: 1;
-        }
-        .webcam-label {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.7);
-            color: #d4af37;
-            font-size: 8px;
-            text-align: center;
-            padding: 3px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        /* Gesture Indicator */
-        .gesture-indicator {
-            position: absolute;
-            top: 100px;
-            right: 40px;
-            background: rgba(0,0,0,0.6);
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            font-size: 24px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .gesture-indicator.active {
-            opacity: 1;
-        }
-
-        /* Status */
-        .status-text {
-            position: absolute;
-            bottom: 40px;
-            right: 40px;
-            color: #d4af37;
-            font-size: 11px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 15px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            border-radius: 20px;
-        }
-        @media (max-width: 768px) {
-            .status-text {
-                display: none;
-            }
-        }
-
-        /* Argon Logo */
-        .argon-logo {
+        .admin-indicator {
             position: fixed;
             bottom: 20px;
-            right: 20px;
-            z-index: 50;
-            opacity: 0.8;
-            transition: opacity 0.3s;
+            left: 20px;
+            color: rgba(255, 215, 0, 0.6);
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            z-index: 5;
+            display: none;
         }
-        .argon-logo img {
-            height: 30px;
-            width: auto;
+        .admin-indicator.show {
+            display: block;
         }
-        .argon-logo:hover {
-            opacity: 1;
+        #file-input { display: none; }
+
+        /* Upload 區域 */
+        .upload-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: none;
+        }
+        .upload-section.admin-enabled {
+            display: block;
+        }
+        .upload-section label {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .upload-section label:hover {
+            background-color: #45a049;
+        }
+        .manage-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            background-color: #2196F3;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        .manage-btn:hover {
+            background-color: #1976D2;
         }
 
-        /* Photo Manager Panel (Admin only) */
+        /* Photo Manager */
         .photo-manager {
             position: fixed;
             top: 50%;
             right: 20px;
             transform: translateY(-50%);
             background: rgba(0, 0, 0, 0.85);
-            border: 1px solid rgba(212, 175, 55, 0.4);
+            border: 1px solid rgba(255, 215, 0, 0.4);
             padding: 15px;
             max-height: 60vh;
             overflow-y: auto;
             z-index: 200;
             display: none;
             min-width: 200px;
+            border-radius: 8px;
             backdrop-filter: blur(10px);
         }
         .photo-manager.active {
             display: block;
         }
         .photo-manager h3 {
-            color: #d4af37;
-            font-size: 11px;
-            letter-spacing: 2px;
+            color: #ffd700;
+            font-size: 14px;
             margin: 0 0 15px 0;
-            text-transform: uppercase;
-            border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
             padding-bottom: 10px;
         }
         .photo-manager .photo-item {
@@ -421,7 +271,7 @@
             width: 50px;
             height: 50px;
             object-fit: cover;
-            border: 1px solid rgba(212, 175, 55, 0.3);
+            border: 1px solid rgba(255, 215, 0, 0.3);
             margin-right: 10px;
         }
         .photo-manager .photo-name {
@@ -445,7 +295,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.3s;
         }
         .photo-manager .delete-btn:hover {
             background: rgba(255, 68, 68, 1);
@@ -471,29 +320,69 @@
             opacity: 1;
         }
 
-        /* Manage Photos Button */
-        .manage-btn {
-            background: rgba(20, 20, 20, 0.6);
-            border: 1px solid rgba(212, 175, 55, 0.4);
-            color: #d4af37;
-            padding: 8px 20px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 9px;
-            transition: all 0.4s;
-            margin-top: 10px;
-            display: inline-block;
+        /* Webcam wrapper */
+        #webcam-wrapper {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 160px;
+            height: 120px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
         }
-        .manage-btn:hover {
-            background: rgba(212, 175, 55, 0.2);
+        #webcam-wrapper.active {
+            opacity: 1;
+        }
+        .webcam-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: #ffd700;
+            font-size: 8px;
+            text-align: center;
+            padding: 3px;
+            text-transform: uppercase;
         }
 
+        /* Argon Logo */
+        .argon-logo {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            z-index: 50;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        .argon-logo img {
+            height: 30px;
+            width: auto;
+        }
+        .argon-logo:hover {
+            opacity: 1;
+        }
+
+        /* Mobile */
         @media (max-width: 768px) {
+            #merry-christmas-text {
+                font-size: 2em;
+            }
+            #controls-panel {
+                left: 10px;
+                bottom: 10px;
+                padding: 10px;
+            }
+            #bottom-hint {
+                display: none;
+            }
             .photo-manager {
                 right: 10px;
                 left: 10px;
-                transform: translateY(-50%);
                 max-height: 50vh;
             }
             .argon-logo {
@@ -543,13 +432,41 @@
     </script>
 </head>
 <body>
+    <video id="webcam-feed" autoplay playsinline></video>
 
-    <div id="loader">
-        <div class="spinner"></div>
-        <div class="loader-text">Loading Holiday Magic</div>
+    <div id="ui-container">
+        <div id="merry-christmas-text">Merry Christmas!</div>
+
+        <div id="controls-panel">
+            <p style="margin: 0 0 10px 0; color: #ffd700;">模式切換:</p>
+            <button id="btn-collapsed">✊ 合攏 (COLLAPSED)</button>
+            <button id="btn-scattered">🖐️ 散開 (SCATTERED)</button>
+            <p style="margin: 10px 0 0 0; font-size: 12px; color: #aaa;">鍵盤: 1/2 切換, H 隱藏, Esc 返回</p>
+
+            <!-- Admin上傳區域 -->
+            <div class="upload-section" id="upload-section">
+                <label>
+                    📷 上傳照片
+                    <input type="file" id="file-input" multiple accept="image/*">
+                </label>
+                <button class="manage-btn" id="manage-photos-btn">管理照片</button>
+            </div>
+        </div>
+
+        <div id="bottom-hint">
+            操作方式：<br>
+            - 鍵盤: 1 合攏, 2 散開, H 隱藏UI, Esc 返回<br>
+            - 手勢: 握拳(合攏), 張開(散開), 捏合(聚焦)<br>
+            - 滑鼠: 拖曳旋轉視角
+        </div>
     </div>
 
-    <div id="canvas-container"></div>
+    <!-- Webcam wrapper -->
+    <div id="webcam-wrapper">
+        <video id="webcam" autoplay playsinline style="display:none;"></video>
+        <canvas id="webcam-preview"></canvas>
+        <div class="webcam-label">Hand Tracking</div>
+    </div>
 
     <!-- Secret trigger: triple-click top-left corner OR Ctrl+Shift+A -->
     <div class="secret-trigger" id="secret-trigger"></div>
@@ -566,50 +483,6 @@
 
     <!-- Admin indicator -->
     <div class="admin-indicator" id="admin-indicator">🔓 Admin Mode</div>
-
-    <div id="ui-layer">
-        <h1>Merry Christmas</h1>
-
-        <div class="upload-wrapper">
-            <label class="upload-btn">
-                Add Memories
-                <input type="file" id="file-input" multiple accept="image/*">
-            </label>
-            <button class="manage-btn" id="manage-photos-btn">Manage Photos</button>
-            <div class="hint-text">Press 'H' to Hide Controls</div>
-        </div>
-
-        <div class="controls-guide" id="controls">
-            <h3>✋ Gesture Control</h3>
-            <p><span class="icon">✊</span> Fist: Form Tree</p>
-            <p><span class="icon">🖐️</span> Open Hand: Scatter</p>
-            <p><span class="icon">🤏</span> Pinch: View Photo</p>
-            <p><span class="icon">👋</span> Move Hand: Rotate</p>
-            <h3 style="margin-top: 12px;">⌨️ Keyboard</h3>
-            <p><span class="icon">1</span> Form Tree</p>
-            <p><span class="icon">2</span> Scatter</p>
-            <p><span class="icon">H</span> Hide Controls</p>
-        </div>
-
-        <div class="status-text" id="status">Christmas Tree</div>
-        <div class="gesture-indicator" id="gesture-indicator">✊</div>
-
-        <!-- Gesture Simulation Controls -->
-        <div id="gesture-controls">
-            <p>手勢模擬 (Gesture Simulation)</p>
-            <div class="gesture-buttons">
-                <button class="gesture-btn active" id="btnCollapse">✊ 握拳 (合攏)</button>
-                <button class="gesture-btn" id="btnScatter">🖐️ 張開 (散開)</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Webcam -->
-    <div id="webcam-wrapper">
-        <video id="webcam" autoplay playsinline style="display:none;"></video>
-        <canvas id="webcam-preview"></canvas>
-        <div class="webcam-label">Hand Tracking</div>
-    </div>
 
     <!-- Argon Logo -->
     <div class="argon-logo">
@@ -643,7 +516,7 @@
         function enableAdminMode() {
             isAdmin = true;
             sessionStorage.setItem('adminLoggedIn', 'true');
-            document.querySelector('.upload-wrapper').classList.add('admin-enabled');
+            document.getElementById('upload-section').classList.add('admin-enabled');
             document.getElementById('admin-indicator').classList.add('show');
             document.getElementById('admin-modal').classList.remove('active');
         }
@@ -849,7 +722,6 @@
         }
 
         function initThree() {
-            const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(CONFIG.colors.bg);
             // 添加一點環境霧氣，增加深度感
@@ -867,7 +739,8 @@
             // 開啟陰影支持
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            container.appendChild(renderer.domElement);
+            // 直接渲染到 body
+            document.body.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
@@ -1853,14 +1726,9 @@
             }
         }
 
-        // 更新按鈕狀態
+        // 更新按鈕狀態（新 UI 無高亮按鈕，保留空函數）
         function updateGestureButtons() {
-            const btnCollapse = document.getElementById('btnCollapse');
-            const btnScatter = document.getElementById('btnScatter');
-            if (btnCollapse && btnScatter) {
-                btnCollapse.classList.toggle('active', STATE.mode === STATES.COLLAPSED);
-                btnScatter.classList.toggle('active', STATE.mode === STATES.SCATTERED);
-            }
+            // 新 UI 不需要按鈕高亮切換
         }
 
         function setupEvents() {
@@ -1873,61 +1741,47 @@
 
             document.getElementById('file-input').addEventListener('change', handleImageUpload);
 
-            // 手勢模擬按鈕事件
-            document.getElementById('btnCollapse').addEventListener('click', () => {
+            // 按鈕事件 - 使用新 ID
+            document.getElementById('btn-collapsed').addEventListener('click', () => {
                 STATE.mode = STATES.COLLAPSED;
                 STATE.autoRotate = true;
                 STATE.focusTarget = null;
-                document.getElementById('status').textContent = 'Christmas Tree';
-                updateGestureButtons();
                 console.log("切換狀態: 合攏 (COLLAPSED)");
             });
 
-            document.getElementById('btnScatter').addEventListener('click', () => {
+            document.getElementById('btn-scattered').addEventListener('click', () => {
                 STATE.mode = STATES.SCATTERED;
                 STATE.autoRotate = false;
                 STATE.focusTarget = null;
-                document.getElementById('status').textContent = 'Floating';
-                updateGestureButtons();
                 console.log("切換狀態: 散開 (SCATTERED)");
             });
 
             // Keyboard controls
             window.addEventListener('keydown', (e) => {
-                const status = document.getElementById('status');
-
                 if (e.key.toLowerCase() === 'h') {
-                    const controls = document.getElementById('controls');
-                    const upload = document.querySelector('.upload-wrapper');
-                    const gestureControls = document.getElementById('gesture-controls');
-                    if (controls) controls.classList.toggle('ui-hidden');
-                    if (upload) upload.classList.toggle('ui-hidden');
-                    if (gestureControls) gestureControls.classList.toggle('ui-hidden');
+                    const controlsPanel = document.getElementById('controls-panel');
+                    const bottomHint = document.getElementById('bottom-hint');
+                    if (controlsPanel) controlsPanel.style.display = controlsPanel.style.display === 'none' ? 'block' : 'none';
+                    if (bottomHint) bottomHint.style.display = bottomHint.style.display === 'none' ? 'block' : 'none';
                 }
                 if (e.key === '1') {
                     STATE.mode = STATES.COLLAPSED;
                     STATE.autoRotate = true;
                     STATE.focusTarget = null;
-                    status.textContent = 'Christmas Tree';
-                    updateGestureButtons();
                 }
                 if (e.key === '2') {
                     STATE.mode = STATES.SCATTERED;
                     STATE.autoRotate = false;
                     STATE.focusTarget = null;
-                    status.textContent = 'Floating';
-                    updateGestureButtons();
                 }
                 if (e.key === 'Escape') {
                     if (STATE.mode === STATES.FOCUS) {
                         STATE.mode = STATES.SCATTERED;
                         STATE.autoRotate = false;
                         STATE.focusTarget = null;
-                        status.textContent = 'Floating';
                     } else if (STATE.mode === STATES.SCATTERED) {
                         STATE.mode = STATES.COLLAPSED;
                         STATE.autoRotate = true;
-                        status.textContent = 'Christmas Tree';
                     }
                     updateGestureButtons();
                 }
