@@ -785,17 +785,20 @@
             },
             particles: {
                 count: 1200,      // 粒子總數
-                dustCount: 1500,  // 浮動塵埃
+                dustCount: 800,   // 浮動塵埃（減少）
+                snowCount: 2000,  // 漫天雪花數量
                 treeHeight: 28,   // 樹高
                 treeRadius: 10,   // 樹底部半徑
-                scatterRadius: 45, // 散開時的範圍半徑
-                giftBoxCount: 10, // 樹下禮盒
-                stringLightCount: 120 // 閃爍燈光
+                scatterRadius: 35, // 散開時的範圍半徑
+                photoCircleRadius: 18, // 照片圍成圈的半徑
+                giftBoxCount: 8,  // 樹下禮盒
+                stringLightCount: 100, // 閃爍燈光
+                goldRingCount: 5  // 金色光環數量
             },
             camera: {
-                z: 55             // 攝影機距離
+                z: 50             // 攝影機距離
             },
-            transitionSpeed: 0.04  // 狀態切換時的飛行速度（越大越快）
+            transitionSpeed: 0.05  // 狀態切換時的飛行速度
         };
 
         // 狀態定義 - 使用新命名
@@ -953,9 +956,12 @@
             caneTexture.repeat.set(3, 3);
         }
 
-        // 用於追蹤照片索引，讓照片在散開時形成立體圈
+        // 用於追蹤照片和特效
         let photoIndex = 0;
         let totalPhotoCount = 0;
+        let goldRings = [];      // 金色光環
+        let snowParticles = [];  // 雪花粒子
+        let photoCircleAngle = 0; // 照片圍繞旋轉角度
 
         class Particle {
             constructor(mesh, type, isDust = false) {
@@ -966,13 +972,15 @@
                 // 合攏態和散開態的位置
                 this.collapsedPos = new THREE.Vector3();
                 this.scatteredPos = new THREE.Vector3();
+                this.groundPos = new THREE.Vector3(); // 照片散落地面位置
                 this.baseScale = mesh.scale.x;
 
-                // 照片專用：記錄在圈中的索引
+                // 照片專用
                 this.photoCircleIndex = -1;
+                this.photoAngleOffset = Math.random() * Math.PI * 2;
 
-                // 自轉速度（照片轉得慢一些）
-                const speedMult = (type === 'PHOTO') ? 0.2 : 1.0;
+                // 自轉速度
+                const speedMult = (type === 'PHOTO') ? 0.1 : 1.0;
                 this.rotationSpeed = new THREE.Vector3(
                     Math.random() * 0.02 * speedMult,
                     Math.random() * 0.02 * speedMult,
@@ -999,10 +1007,17 @@
 
                 // === 計算【散開態】位置 ===
                 if (this.type === 'PHOTO') {
-                    // 照片：圍成立體圈（稍後在 setPhotoCirclePosition 中設定）
+                    // 照片：圍成圈旋轉（動態計算）
                     this.scatteredPos.set(0, 0, 0);
+                    // 照片散落地面位置（合攏時）
+                    const groundAngle = Math.random() * Math.PI * 2;
+                    const groundRadius = 8 + Math.random() * 12;
+                    this.groundPos.set(
+                        Math.cos(groundAngle) * groundRadius,
+                        -h / 2 - 0.5, // 地面高度
+                        Math.sin(groundAngle) * groundRadius
+                    );
                 } else if (this.isDust) {
-                    // 塵埃：更大範圍
                     this.scatteredPos.set(
                         (Math.random() - 0.5) * scatterR * 2.5,
                         (Math.random() - 0.5) * scatterR * 2.5,
@@ -1021,18 +1036,21 @@
                 }
             }
 
-            // 設定照片在立體圈中的位置
+            // 設定照片在圓環中的位置（靜態索引）
             setPhotoCirclePosition(index, total) {
                 this.photoCircleIndex = index;
-                const circleRadius = CONFIG.particles.scatterRadius * 0.5;
-                // 在球面上均勻分布
-                const phi = Math.acos(1 - 2 * (index + 0.5) / total);
-                const theta = Math.PI * (1 + Math.sqrt(5)) * index; // 黃金角分布
+                this.photoAngleOffset = (index / total) * Math.PI * 2;
+            }
 
-                this.scatteredPos.set(
-                    circleRadius * Math.sin(phi) * Math.cos(theta),
-                    circleRadius * Math.cos(phi),
-                    circleRadius * Math.sin(phi) * Math.sin(theta)
+            // 獲取照片旋轉圈的當前位置
+            getPhotoCirclePosition(globalAngle) {
+                const circleRadius = CONFIG.particles.photoCircleRadius;
+                const angle = globalAngle + this.photoAngleOffset;
+                const y = Math.sin(this.photoAngleOffset * 2) * 3; // 輕微高低起伏
+                return new THREE.Vector3(
+                    Math.cos(angle) * circleRadius,
+                    y,
+                    Math.sin(angle) * circleRadius
                 );
             }
 
@@ -1042,15 +1060,28 @@
 
                 // 根據當前狀態決定目標位置
                 if (mode === STATES.COLLAPSED) {
-                    target = this.collapsedPos;
+                    if (this.type === 'PHOTO') {
+                        // 照片散落地面
+                        target = this.groundPos;
+                    } else {
+                        target = this.collapsedPos;
+                    }
                 } else if (mode === STATES.SCATTERED) {
-                    target = this.scatteredPos;
+                    if (this.type === 'PHOTO') {
+                        // 照片圍成圈旋轉
+                        target = this.getPhotoCirclePosition(photoCircleAngle);
+                    } else {
+                        target = this.scatteredPos;
+                    }
                 } else if (mode === STATES.FOCUS) {
                     if (this.mesh === focusTargetMesh) {
-                        // 聚焦的照片移到攝影機前方
-                        const desiredWorldPos = new THREE.Vector3(0, 20, 70);
+                        // 聚焦的照片移到螢幕中央
+                        const desiredWorldPos = new THREE.Vector3(0, 5, 30);
                         const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
                         target = desiredWorldPos.applyMatrix4(invMatrix);
+                    } else if (this.type === 'PHOTO') {
+                        // 其他照片繼續圍繞
+                        target = this.getPhotoCirclePosition(photoCircleAngle);
                     } else {
                         target = this.scatteredPos;
                     }
@@ -1058,30 +1089,28 @@
                     target = this.collapsedPos;
                 }
 
-                // 使用 lerp 平滑過渡到目標位置
+                // 使用 lerp 平滑過渡
                 this.mesh.position.lerp(target, lerpSpeed);
 
-                // 自轉處理
+                // 旋轉處理
                 if (this.type === 'PHOTO') {
-                    // 照片在散開態時朝向中心
-                    if (mode === STATES.SCATTERED || mode === STATES.FOCUS) {
+                    if (mode === STATES.COLLAPSED) {
+                        // 地面上的照片平躺，輕微傾斜
+                        this.mesh.rotation.x = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+                        this.mesh.rotation.z = this.photoAngleOffset;
+                    } else if (mode === STATES.SCATTERED || mode === STATES.FOCUS) {
                         if (this.mesh !== focusTargetMesh) {
-                            // 讓照片面朝中心
-                            const lookTarget = new THREE.Vector3(0, this.mesh.position.y * 0.5, 0);
-                            this.mesh.lookAt(lookTarget);
+                            // 照片面向中心
+                            this.mesh.lookAt(new THREE.Vector3(0, 0, 0));
                         }
-                    } else {
-                        // 合攏態時輕微自轉
-                        this.mesh.rotation.y += this.rotationSpeed.y;
                     }
                 } else {
-                    // 一般粒子自轉
                     this.mesh.rotation.x += this.rotationSpeed.x;
                     this.mesh.rotation.y += this.rotationSpeed.y;
                     this.mesh.rotation.z += this.rotationSpeed.z;
                 }
 
-                // 聚焦模式下選中的照片朝向攝影機
+                // 聚焦的照片面向攝影機
                 if (mode === STATES.FOCUS && this.mesh === focusTargetMesh) {
                     this.mesh.lookAt(camera.position);
                 }
@@ -1093,25 +1122,25 @@
                     if (mode === STATES.COLLAPSED) s = 0;
                 } else if (this.type === 'PHOTO') {
                     if (mode === STATES.COLLAPSED) {
-                        s = 0; // 合攏時隱藏照片
+                        s = this.baseScale * 1.8; // 地面上的照片
                     } else if (mode === STATES.SCATTERED) {
-                        s = this.baseScale * 2.5; // 散開時放大
+                        s = this.baseScale * 2.2; // 圍繞時
                     } else if (mode === STATES.FOCUS) {
                         if (this.mesh === focusTargetMesh) {
-                            s = 5.0; // 聚焦時更大
+                            s = 6.0; // 聚焦放大
                         } else {
-                            s = this.baseScale * 1.5; // 其他照片稍微縮小
+                            s = this.baseScale * 1.5;
                         }
                     }
                 } else if (mode === STATES.FOCUS) {
-                    s = this.baseScale * 0.6; // 聚焦時其他裝飾品縮小
+                    s = this.baseScale * 0.5;
                 }
 
                 this.mesh.scale.lerp(new THREE.Vector3(s, s, s), 4 * dt);
             }
         }
 
-        // 更新所有照片的立體圈位置
+        // 更新所有照片的圓環位置索引
         function updatePhotoCirclePositions() {
             const photos = particleSystem.filter(p => p.type === 'PHOTO');
             totalPhotoCount = photos.length;
@@ -1290,7 +1319,127 @@
             // === 禮盒 ===
             createGiftBoxes();
 
+            // === 金色光環 (環繞聖誕樹) ===
+            createGoldRings();
+
+            // === 漫天雪花 ===
+            createSnowfall();
+
             mainGroup.add(photoMeshGroup);
+        }
+
+        // 創建金色光環環繞聖誕樹
+        function createGoldRings() {
+            const ringCount = CONFIG.particles.goldRingCount;
+            const treeHeight = CONFIG.particles.treeHeight;
+
+            for (let i = 0; i < ringCount; i++) {
+                // 計算每個光環的高度和半徑
+                const heightRatio = (i + 0.5) / ringCount;
+                const y = (heightRatio - 0.5) * treeHeight;
+                const radius = CONFIG.particles.treeRadius * (1 - heightRatio) * 1.2 + 1;
+
+                // 創建光環幾何
+                const ringGeo = new THREE.TorusGeometry(radius, 0.08, 8, 64);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffd700,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.set(0, y, 0);
+                ring.rotation.x = Math.PI / 2;
+                ring.userData.baseY = y;
+                ring.userData.phase = i * 0.5;
+
+                mainGroup.add(ring);
+                goldRings.push(ring);
+            }
+        }
+
+        // 創建漫天雪花
+        function createSnowfall() {
+            const snowGeo = new THREE.BufferGeometry();
+            const snowCount = CONFIG.particles.snowCount;
+            const positions = new Float32Array(snowCount * 3);
+            const velocities = [];
+
+            const range = 60;
+            const height = 80;
+
+            for (let i = 0; i < snowCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * range;
+                positions[i * 3 + 1] = Math.random() * height - 20;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * range;
+
+                velocities.push({
+                    x: (Math.random() - 0.5) * 0.02,
+                    y: -0.05 - Math.random() * 0.1,
+                    z: (Math.random() - 0.5) * 0.02
+                });
+            }
+
+            snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const snowMat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.3,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            const snow = new THREE.Points(snowGeo, snowMat);
+            snow.userData.velocities = velocities;
+            scene.add(snow);
+            snowParticles.push(snow);
+        }
+
+        // 更新雪花位置
+        function updateSnowfall() {
+            snowParticles.forEach(snow => {
+                const positions = snow.geometry.attributes.position.array;
+                const velocities = snow.userData.velocities;
+                const range = 60;
+                const height = 80;
+
+                for (let i = 0; i < velocities.length; i++) {
+                    positions[i * 3] += velocities[i].x;
+                    positions[i * 3 + 1] += velocities[i].y;
+                    positions[i * 3 + 2] += velocities[i].z;
+
+                    // 重置超出範圍的雪花
+                    if (positions[i * 3 + 1] < -20) {
+                        positions[i * 3] = (Math.random() - 0.5) * range;
+                        positions[i * 3 + 1] = height / 2;
+                        positions[i * 3 + 2] = (Math.random() - 0.5) * range;
+                    }
+                }
+
+                snow.geometry.attributes.position.needsUpdate = true;
+            });
+        }
+
+        // 更新金色光環
+        function updateGoldRings(dt, mode) {
+            goldRings.forEach((ring, index) => {
+                // 合攏時顯示並旋轉，散開時隱藏
+                if (mode === STATES.COLLAPSED) {
+                    ring.visible = true;
+                    ring.rotation.z += 0.3 * dt;
+                    // 輕微上下浮動
+                    ring.position.y = ring.userData.baseY + Math.sin(clock.elapsedTime * 2 + ring.userData.phase) * 0.3;
+                    // 閃爍效果
+                    ring.material.opacity = 0.6 + 0.4 * Math.sin(clock.elapsedTime * 3 + ring.userData.phase);
+                } else {
+                    // 淡出
+                    ring.material.opacity = Math.max(0, ring.material.opacity - dt * 2);
+                    if (ring.material.opacity <= 0) {
+                        ring.visible = false;
+                    }
+                }
+            });
         }
 
         // Create gingerbread man geometry
@@ -1813,6 +1962,11 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
+            // 更新照片圍繞旋轉角度
+            if (STATE.mode === STATES.SCATTERED || STATE.mode === STATES.FOCUS) {
+                photoCircleAngle += dt * 0.3; // 照片圍繞旋轉速度
+            }
+
             // 旋轉邏輯
             if (STATE.mode === STATES.SCATTERED && STATE.hand.detected) {
                 // 手勢控制旋轉
@@ -1823,11 +1977,11 @@
             } else {
                 if (STATE.autoRotate) {
                     // 合攏時自動旋轉展示
-                    STATE.rotation.y += 0.5 * dt;
+                    STATE.rotation.y += 0.4 * dt;
                     STATE.rotation.x += (0 - STATE.rotation.x) * 2.0 * dt;
                 } else {
-                    // 散開時緩慢旋轉
-                    STATE.rotation.y += 0.1 * dt;
+                    // 散開時緩慢旋轉（場景整體）
+                    STATE.rotation.y += 0.15 * dt;
                 }
             }
 
@@ -1836,6 +1990,22 @@
 
             // 更新所有粒子
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
+
+            // 更新金色光環
+            updateGoldRings(dt, STATE.mode);
+
+            // 更新雪花
+            if (STATE.mode === STATES.COLLAPSED) {
+                updateSnowfall();
+                snowParticles.forEach(s => {
+                    s.material.opacity = Math.min(0.8, s.material.opacity + dt);
+                });
+            } else {
+                // 非合攏態時淡出雪花
+                snowParticles.forEach(s => {
+                    s.material.opacity = Math.max(0, s.material.opacity - dt * 0.5);
+                });
+            }
 
             // 閃爍燈光效果
             particleSystem.forEach(p => {
