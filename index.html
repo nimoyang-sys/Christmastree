@@ -784,18 +784,18 @@
                 iceBlue: 0x87ceeb,
             },
             particles: {
-                count: 800,       // 粒子總數，用於新的圓錐分布
-                dustCount: 1000,  // 浮動塵埃
-                treeHeight: 60,   // 增大樹高
-                treeRadius: 25,   // 增大樹底部半徑
-                scatterRadius: 80, // 散開時的範圍半徑
-                giftBoxCount: 8,  // 樹下禮盒
-                stringLightCount: 80 // 閃爍燈光
+                count: 1200,      // 粒子總數
+                dustCount: 1500,  // 浮動塵埃
+                treeHeight: 28,   // 樹高
+                treeRadius: 10,   // 樹底部半徑
+                scatterRadius: 45, // 散開時的範圍半徑
+                giftBoxCount: 10, // 樹下禮盒
+                stringLightCount: 120 // 閃爍燈光
             },
             camera: {
-                z: 120            // 調整攝影機距離
+                z: 55             // 攝影機距離
             },
-            transitionSpeed: 0.03  // 狀態切換時的飛行速度
+            transitionSpeed: 0.04  // 狀態切換時的飛行速度（越大越快）
         };
 
         // 狀態定義 - 使用新命名
@@ -852,8 +852,8 @@
             // 添加一點環境霧氣，增加深度感
             scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.005);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 20, CONFIG.camera.z);
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, CONFIG.camera.z);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -876,39 +876,44 @@
         }
 
         function setupLights() {
-            // 新的高級燈光系統 - 營造高級感
+            // 高級燈光系統 - 金碧輝煌的氛圍
 
-            // 微弱環境光
-            const ambient = new THREE.AmbientLight(0x333333, 0.5);
+            // 環境光
+            const ambient = new THREE.AmbientLight(0x444444, 0.6);
             scene.add(ambient);
 
-            // 主光源 - 金色暖光，製造高光
-            const mainLight = new THREE.DirectionalLight(0xffd700, 3);
-            mainLight.position.set(50, 50, 50);
+            // 主光源 - 金色暖光
+            const mainLight = new THREE.DirectionalLight(0xffd700, 2.5);
+            mainLight.position.set(30, 30, 30);
             mainLight.castShadow = true;
             scene.add(mainLight);
 
             // 補光 - 紅色側光，增加節日氛圍
-            const rimLight = new THREE.PointLight(0xff0000, 2, 200);
-            rimLight.position.set(-50, 10, -50);
+            const rimLight = new THREE.PointLight(0xff4400, 1.5, 100);
+            rimLight.position.set(-25, 5, -25);
             scene.add(rimLight);
 
-            // 底部向上打的光，照亮樹底
-            const bottomLight = new THREE.PointLight(0x00ff00, 1, 150);
-            bottomLight.position.set(0, -30, 0);
+            // 底部向上打的綠光，照亮樹底
+            const bottomLight = new THREE.PointLight(0x00aa00, 0.8, 60);
+            bottomLight.position.set(0, -15, 0);
             scene.add(bottomLight);
 
             // 內部暖光
-            const innerLight = new THREE.PointLight(0xffaa00, 2, 80);
+            const innerLight = new THREE.PointLight(0xffaa00, 1.5, 40);
             innerLight.position.set(0, 0, 0);
             mainGroup.add(innerLight);
 
             // 頂部聚光燈
-            const topSpot = new THREE.SpotLight(0xffcc66, 800);
-            topSpot.position.set(0, 80, 60);
+            const topSpot = new THREE.SpotLight(0xffcc66, 500);
+            topSpot.position.set(0, 40, 35);
             topSpot.angle = 0.6;
             topSpot.penumbra = 0.5;
             scene.add(topSpot);
+
+            // 藍色補光（冷暖對比）
+            const blueLight = new THREE.PointLight(0x4488ff, 0.5, 80);
+            blueLight.position.set(20, -5, 20);
+            scene.add(blueLight);
         }
 
         function setupPostProcessing() {
@@ -948,6 +953,10 @@
             caneTexture.repeat.set(3, 3);
         }
 
+        // 用於追蹤照片索引，讓照片在散開時形成立體圈
+        let photoIndex = 0;
+        let totalPhotoCount = 0;
+
         class Particle {
             constructor(mesh, type, isDust = false) {
                 this.mesh = mesh;
@@ -959,13 +968,15 @@
                 this.scatteredPos = new THREE.Vector3();
                 this.baseScale = mesh.scale.x;
 
-                const speedMult = (type === 'PHOTO') ? 0.3 : 2.0;
+                // 照片專用：記錄在圈中的索引
+                this.photoCircleIndex = -1;
 
-                // 自轉速度
+                // 自轉速度（照片轉得慢一些）
+                const speedMult = (type === 'PHOTO') ? 0.2 : 1.0;
                 this.rotationSpeed = new THREE.Vector3(
-                    Math.random() * 0.05,
-                    Math.random() * 0.05,
-                    Math.random() * 0.05
+                    Math.random() * 0.02 * speedMult,
+                    Math.random() * 0.02 * speedMult,
+                    Math.random() * 0.02 * speedMult
                 );
 
                 this.calculatePositions();
@@ -977,36 +988,57 @@
                 const scatterR = CONFIG.particles.scatterRadius;
 
                 // === 計算【合攏態】位置 (圓錐體分布) ===
-                // 使用圓柱坐標系隨機生成，然後映射到圓錐上
                 const angle = Math.random() * Math.PI * 2;
-                const heightRatio = Math.random(); // 0 到 1 的高度比例
-                const y = (heightRatio - 0.5) * h; // 映射到實際高度範圍
-                // 圓錐半徑隨高度變化：底部最寬，頂部最窄
+                const heightRatio = Math.random();
+                const y = (heightRatio - 0.5) * h;
                 let currentRadius = (1 - heightRatio) * r;
                 if (currentRadius < 0.5) currentRadius = 0.5;
                 const x = Math.cos(angle) * currentRadius;
                 const z = Math.sin(angle) * currentRadius;
                 this.collapsedPos.set(x, y, z);
 
-                // === 計算【散開態】位置 (球形範圍內隨機漂浮) ===
-                if (this.isDust) {
-                    // 塵埃在更大範圍
+                // === 計算【散開態】位置 ===
+                if (this.type === 'PHOTO') {
+                    // 照片：圍成立體圈（稍後在 setPhotoCirclePosition 中設定）
+                    this.scatteredPos.set(0, 0, 0);
+                } else if (this.isDust) {
+                    // 塵埃：更大範圍
                     this.scatteredPos.set(
                         (Math.random() - 0.5) * scatterR * 2.5,
                         (Math.random() - 0.5) * scatterR * 2.5,
                         (Math.random() - 0.5) * scatterR * 2.5
                     );
                 } else {
+                    // 一般裝飾品：球形分布
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const radius = scatterR * (0.3 + Math.random() * 0.7);
                     this.scatteredPos.set(
-                        (Math.random() - 0.5) * scatterR * 2,
-                        (Math.random() - 0.5) * scatterR * 2,
-                        (Math.random() - 0.5) * scatterR * 2
+                        radius * Math.sin(phi) * Math.cos(theta),
+                        radius * Math.sin(phi) * Math.sin(theta),
+                        radius * Math.cos(phi)
                     );
                 }
             }
 
+            // 設定照片在立體圈中的位置
+            setPhotoCirclePosition(index, total) {
+                this.photoCircleIndex = index;
+                const circleRadius = CONFIG.particles.scatterRadius * 0.5;
+                // 在球面上均勻分布
+                const phi = Math.acos(1 - 2 * (index + 0.5) / total);
+                const theta = Math.PI * (1 + Math.sqrt(5)) * index; // 黃金角分布
+
+                this.scatteredPos.set(
+                    circleRadius * Math.sin(phi) * Math.cos(theta),
+                    circleRadius * Math.cos(phi),
+                    circleRadius * Math.sin(phi) * Math.sin(theta)
+                );
+            }
+
             update(dt, mode, focusTargetMesh) {
                 let target;
+                const lerpSpeed = CONFIG.transitionSpeed;
 
                 // 根據當前狀態決定目標位置
                 if (mode === STATES.COLLAPSED) {
@@ -1016,7 +1048,7 @@
                 } else if (mode === STATES.FOCUS) {
                     if (this.mesh === focusTargetMesh) {
                         // 聚焦的照片移到攝影機前方
-                        const desiredWorldPos = new THREE.Vector3(0, 20, 80);
+                        const desiredWorldPos = new THREE.Vector3(0, 20, 70);
                         const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
                         target = desiredWorldPos.applyMatrix4(invMatrix);
                     } else {
@@ -1027,14 +1059,29 @@
                 }
 
                 // 使用 lerp 平滑過渡到目標位置
-                this.mesh.position.lerp(target, CONFIG.transitionSpeed);
+                this.mesh.position.lerp(target, lerpSpeed);
 
-                // 粒子自轉
-                this.mesh.rotation.x += this.rotationSpeed.x;
-                this.mesh.rotation.y += this.rotationSpeed.y;
-                this.mesh.rotation.z += this.rotationSpeed.z;
+                // 自轉處理
+                if (this.type === 'PHOTO') {
+                    // 照片在散開態時朝向中心
+                    if (mode === STATES.SCATTERED || mode === STATES.FOCUS) {
+                        if (this.mesh !== focusTargetMesh) {
+                            // 讓照片面朝中心
+                            const lookTarget = new THREE.Vector3(0, this.mesh.position.y * 0.5, 0);
+                            this.mesh.lookAt(lookTarget);
+                        }
+                    } else {
+                        // 合攏態時輕微自轉
+                        this.mesh.rotation.y += this.rotationSpeed.y;
+                    }
+                } else {
+                    // 一般粒子自轉
+                    this.mesh.rotation.x += this.rotationSpeed.x;
+                    this.mesh.rotation.y += this.rotationSpeed.y;
+                    this.mesh.rotation.z += this.rotationSpeed.z;
+                }
 
-                // 聚焦模式下照片朝向攝影機
+                // 聚焦模式下選中的照片朝向攝影機
                 if (mode === STATES.FOCUS && this.mesh === focusTargetMesh) {
                     this.mesh.lookAt(camera.position);
                 }
@@ -1043,84 +1090,198 @@
                 let s = this.baseScale;
                 if (this.isDust) {
                     s = this.baseScale * (0.8 + 0.4 * Math.sin(clock.elapsedTime * 4 + this.mesh.id));
-                    if (mode === STATES.COLLAPSED) s = 0; // 合攏時隱藏塵埃
-                } else if (mode === STATES.SCATTERED && this.type === 'PHOTO') {
-                    s = this.baseScale * 2.5;
+                    if (mode === STATES.COLLAPSED) s = 0;
+                } else if (this.type === 'PHOTO') {
+                    if (mode === STATES.COLLAPSED) {
+                        s = 0; // 合攏時隱藏照片
+                    } else if (mode === STATES.SCATTERED) {
+                        s = this.baseScale * 2.5; // 散開時放大
+                    } else if (mode === STATES.FOCUS) {
+                        if (this.mesh === focusTargetMesh) {
+                            s = 5.0; // 聚焦時更大
+                        } else {
+                            s = this.baseScale * 1.5; // 其他照片稍微縮小
+                        }
+                    }
                 } else if (mode === STATES.FOCUS) {
-                    if (this.mesh === focusTargetMesh) s = 4.5;
-                    else s = this.baseScale * 0.8;
+                    s = this.baseScale * 0.6; // 聚焦時其他裝飾品縮小
                 }
 
                 this.mesh.scale.lerp(new THREE.Vector3(s, s, s), 4 * dt);
             }
         }
 
-        function createParticles() {
-            // === 幾何形狀 (簡化為球體和正方體) ===
-            const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-            const boxGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+        // 更新所有照片的立體圈位置
+        function updatePhotoCirclePositions() {
+            const photos = particleSystem.filter(p => p.type === 'PHOTO');
+            totalPhotoCount = photos.length;
+            photos.forEach((p, index) => {
+                p.setPhotoCirclePosition(index, totalPhotoCount);
+            });
+        }
 
-            // === 新的高級材質定義 ===
-            // 1. 啞光綠 (Roughness高，Metalness低)
+        function createParticles() {
+            // === 幾何形狀 ===
+            const sphereGeo = new THREE.SphereGeometry(0.5, 32, 32);
+            const boxGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+
+            // 糖果棍曲線
+            const candyCurve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.3, 0),
+                new THREE.Vector3(0.1, 0.5, 0), new THREE.Vector3(0.3, 0.4, 0)
+            ]);
+            const candyGeo = new THREE.TubeGeometry(candyCurve, 16, 0.08, 8, false);
+
+            // 雪花幾何（六邊形）
+            const snowflakeShape = new THREE.Shape();
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2;
+                const nextAngle = ((i + 1) / 6) * Math.PI * 2;
+                const innerAngle = (i + 0.5) / 6 * Math.PI * 2;
+                if (i === 0) snowflakeShape.moveTo(Math.cos(angle) * 0.5, Math.sin(angle) * 0.5);
+                snowflakeShape.lineTo(Math.cos(innerAngle) * 0.2, Math.sin(innerAngle) * 0.2);
+                snowflakeShape.lineTo(Math.cos(nextAngle) * 0.5, Math.sin(nextAngle) * 0.5);
+            }
+            const snowflakeGeo = new THREE.ExtrudeGeometry(snowflakeShape, { depth: 0.02, bevelEnabled: false });
+
+            // 星形裝飾幾何
+            const starShape = new THREE.Shape();
+            for (let i = 0; i < 5; i++) {
+                const outerAngle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+                const innerAngle = ((i + 0.5) / 5) * Math.PI * 2 - Math.PI / 2;
+                if (i === 0) starShape.moveTo(Math.cos(outerAngle) * 0.4, Math.sin(outerAngle) * 0.4);
+                else starShape.lineTo(Math.cos(outerAngle) * 0.4, Math.sin(outerAngle) * 0.4);
+                starShape.lineTo(Math.cos(innerAngle) * 0.15, Math.sin(innerAngle) * 0.15);
+            }
+            starShape.closePath();
+            const starOrnamentGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 });
+
+            // 薑餅人幾何
+            const gingerbreadGeo = createGingerbreadGeometry();
+
+            // === 高級材質定義 ===
+            // 1. 啞光綠
             const matteGreenMat = new THREE.MeshStandardMaterial({
                 color: CONFIG.colors.deepGreen,
                 roughness: 0.9,
                 metalness: 0.1,
             });
 
-            // 2. 金屬金 (Roughness低，Metalness高，是輝光的主要來源)
+            // 2. 金屬金（輝光主要來源）
             const metalGoldMat = new THREE.MeshStandardMaterial({
                 color: CONFIG.colors.champagneGold,
                 roughness: 0.15,
                 metalness: 0.9,
-                emissive: 0x332200,
+                emissive: 0x443300,
+                emissiveIntensity: 0.4
+            });
+
+            // 3. 聖誕紅
+            const satinRedMat = new THREE.MeshPhysicalMaterial({
+                color: CONFIG.colors.accentRed,
+                roughness: 0.3,
+                metalness: 0.3,
+                clearcoat: 0.8,
+                emissive: 0x330000,
+                emissiveIntensity: 0.2
+            });
+
+            // 糖果棍材質
+            const candyMat = new THREE.MeshStandardMaterial({ map: caneTexture, roughness: 0.4 });
+
+            // 雪花材質
+            const snowMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.snowWhite,
+                metalness: 0.1, roughness: 0.3,
+                emissive: 0xaaddff,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            // 銀色材質
+            const silverMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                metalness: 1.0, roughness: 0.1,
+                emissive: 0x444444,
                 emissiveIntensity: 0.3
             });
 
-            // 3. 聖誕紅 (介於兩者之間)
-            const satinRedMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.colors.accentRed,
-                roughness: 0.4,
-                metalness: 0.3,
+            // 薑餅人材質
+            const gingerbreadMat = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.gingerbread,
+                roughness: 0.9, metalness: 0.0,
             });
 
-            // 用於隨機選擇的材質陣列
-            const materials = [matteGreenMat, metalGoldMat, satinRedMat];
-            const geometries = [sphereGeo, boxGeo];
-
-            // === 創建粒子裝飾品 ===
+            // === 創建裝飾品 ===
             for (let i = 0; i < CONFIG.particles.count; i++) {
-                // 隨機選擇材質和形狀
-                const mat = materials[Math.floor(Math.random() * materials.length)];
-                const geo = geometries[Math.floor(Math.random() * geometries.length)];
-                const mesh = new THREE.Mesh(geo, mat);
+                const rand = Math.random();
+                let mesh, type;
+
+                if (rand < 0.18) {
+                    // 啞光綠球
+                    mesh = new THREE.Mesh(sphereGeo, matteGreenMat);
+                    type = 'GREEN_BALL';
+                } else if (rand < 0.33) {
+                    // 金屬金球
+                    mesh = new THREE.Mesh(sphereGeo, metalGoldMat);
+                    type = 'GOLD_BALL';
+                } else if (rand < 0.45) {
+                    // 聖誕紅球
+                    mesh = new THREE.Mesh(sphereGeo, satinRedMat);
+                    type = 'RED_BALL';
+                } else if (rand < 0.52) {
+                    // 銀球
+                    mesh = new THREE.Mesh(sphereGeo, silverMat);
+                    type = 'SILVER_BALL';
+                } else if (rand < 0.62) {
+                    // 糖果棍
+                    mesh = new THREE.Mesh(candyGeo, candyMat);
+                    type = 'CANDY_CANE';
+                } else if (rand < 0.72) {
+                    // 雪花
+                    mesh = new THREE.Mesh(snowflakeGeo, snowMat);
+                    type = 'SNOWFLAKE';
+                } else if (rand < 0.82) {
+                    // 星形裝飾
+                    mesh = new THREE.Mesh(starOrnamentGeo, metalGoldMat.clone());
+                    mesh.material.emissive = new THREE.Color(0xffaa00);
+                    mesh.material.emissiveIntensity = 0.6;
+                    type = 'STAR_ORNAMENT';
+                } else if (rand < 0.90) {
+                    // 薑餅人
+                    mesh = new THREE.Mesh(gingerbreadGeo, gingerbreadMat);
+                    type = 'GINGERBREAD';
+                } else {
+                    // 金色方塊
+                    mesh = new THREE.Mesh(boxGeo, metalGoldMat);
+                    type = 'GOLD_BOX';
+                }
+
+                const s = 0.4 + Math.random() * 0.5;
+                mesh.scale.set(s, s, s);
+                mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
 
-                // 隨機大小變化
-                const s = Math.random() * 1.2 + 0.5;
-                mesh.scale.set(s, s, s);
-                mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-
                 mainGroup.add(mesh);
-                particleSystem.push(new Particle(mesh, 'ORNAMENT', false));
+                particleSystem.push(new Particle(mesh, type, false));
             }
 
-            // === 頂部星星 (新樣式) ===
-            const topStarGeo = new THREE.OctahedronGeometry(3, 0);
+            // === 頂部星星 ===
+            const topStarGeo = new THREE.OctahedronGeometry(1.5, 0);
             const topStarMat = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
                 emissive: 0xffd700,
-                emissiveIntensity: 2,
-                toneMapped: false  // 防止被色調映射壓暗，保持極亮
+                emissiveIntensity: 2.5,
+                toneMapped: false
             });
             const topStar = new THREE.Mesh(topStarGeo, topStarMat);
-            topStar.position.set(0, CONFIG.particles.treeHeight / 2 + 5, 0);
+            topStar.position.set(0, CONFIG.particles.treeHeight / 2 + 2, 0);
             mainGroup.add(topStar);
-            // 為星星添加狀態數據
-            const starParticle = new Particle(topStar, 'STAR', false);
-            starParticle.collapsedPos.set(0, CONFIG.particles.treeHeight / 2 + 5, 0);
-            starParticle.scatteredPos.set(0, CONFIG.particles.scatterRadius, 0);
+            const starParticle = new Particle(topStar, 'TOP_STAR', false);
+            starParticle.collapsedPos.set(0, CONFIG.particles.treeHeight / 2 + 2, 0);
+            starParticle.scatteredPos.set(0, CONFIG.particles.scatterRadius * 0.6, 0);
             particleSystem.push(starParticle);
 
             // === 閃爍燈光 ===
@@ -1330,6 +1491,8 @@
 
             photoMeshGroup.add(group);
             particleSystem.push(new Particle(group, 'PHOTO', false));
+            // 更新照片立體圈位置
+            updatePhotoCirclePositions();
             return group;
         }
 
